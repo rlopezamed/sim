@@ -1,4 +1,4 @@
-# --- Single-image approach with Bun for build + runtime ---
+# Bun image for build + runtime
 FROM oven/bun:1
 
 WORKDIR /app
@@ -7,18 +7,19 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     PORT=3000
 
-# Biome is executed via `bunx` in prebuild; make sure bunx exists
+# Ensure `bunx` exists (repo runs it in scripts)
 RUN ln -sf "$(command -v bun)" /usr/local/bin/bunx || true
 
-# Install deps
-COPY bun.lockb package.json ./
+# Copy everything (we’ll rely on .dockerignore to keep the context small)
 COPY . .
-RUN bun install --frozen-lockfile
 
-# Build the app (turborepo root will build apps/sim)
+# Install deps (try frozen lock if present; otherwise normal install)
+RUN (test -f bun.lockb && bun install --frozen-lockfile) || bun install
+
+# Build the app (turborepo root builds apps/sim)
 RUN bun run build
 
-# Copy an entrypoint that runs DB migrations, then starts the app
+# Entrypoint will run migrations then start the server
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
